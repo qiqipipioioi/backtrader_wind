@@ -32,7 +32,6 @@ class WindStore(object):
         if self.logon.ErrorCode == 0:
             print("logon success!")
         else:
-            print(self.logon)
             raise
 
         self.symbol = target
@@ -63,21 +62,14 @@ class WindStore(object):
         return wrapper
 
     
-    def cancel_open_orders(self):
-        orders = self.windbroker.get_open_orders(symbol=self.symbol)
-        if len(orders) > 0:
-            for o in orders:
-                id = o.windorder[0]
-                self.cancel_order(id)
 
     @retry
     def cancel_order(self, order_id):
-        self.w.tcancel(OrderNumber = order_id)
+        return self.w.tcancel(OrderNumber = order_id)
 
     
     @retry
     def create_order(self, side, type, size, price):
-        print(self.symbol, side, price, size)
         return self.w.torder(SecurityCode = self.symbol, TradeSide = side, OrderPrice = price, \
                              OrderVolume = size)
 
@@ -113,18 +105,6 @@ class WindStore(object):
     @retry
     def get_history_data(self, symbol, start_date):
         return self.w.wsi(codes = symbol, fields = "open, high, low, close, volume", beginTime = start_date)
-        
-    # def get_filters(self):
-    #     symbol_info = self.get_symbol_info(self.symbol)
-    #     for f in symbol_info['filters']:
-    #         if f['filterType'] == 'LOT_SIZE':
-    #             self._step_size = f['stepSize']
-    #         elif f['filterType'] == 'PRICE_FILTER':
-    #             self._tick_size = f['tickSize']
-
-    # def get_interval(self, timeframe, compression):
-    #     return self._GRANULARITIES.get((timeframe, compression))
-
     
     def get_symbol_info(self, symbol):
         return symbol

@@ -22,8 +22,14 @@ class WindOrder(OrderBase):
         self.owner = owner
         self.data = data
         self.exectype = exectype
-        print('windorder, ', wind_order)
-        self.ordtype = order_types.index(wind_order[2])
+
+        wind_order_status = wind_order[2]
+        if wind_order_status == "Short":
+            wind_order_status = "Sell"
+        elif wind_order_status == "Cover":
+            wind_order_status = "Buy"
+
+        self.ordtype = order_types.index(wind_order_status)
         
         
         self.price = float(wind_order[3])
@@ -179,6 +185,7 @@ class WindBroker(BrokerBase):
 
         self.order_dict = order_dict
 
+
         return [this_order_id, 
                 this_order_status,
                 this_order_side, 
@@ -235,7 +242,6 @@ class WindBroker(BrokerBase):
                     wind_order[3])
             
             self._set_order_status(order, wind_order[1])
-            print('order_stauts:', order.status, Order.submit, wind_order)
             if order.status == Order.Submitted:
                 self.open_orders.append(order)
             self.notify(order)
@@ -246,7 +252,11 @@ class WindBroker(BrokerBase):
             trailamount=None, trailpercent=None,
             **kwargs):
         print("BBBBBBUUUUUUYYYYY")
-        side = "Buy"
+        pos = self.positions[None].size
+        if pos >= 0:
+            side = "Buy"
+        else:
+            side = "Cover"
         return self._submit(owner, data, side, exectype, size, price)
 
     def sell(self, owner, data, size, price=None, plimit=None,
@@ -254,26 +264,21 @@ class WindBroker(BrokerBase):
             trailamount=None, trailpercent=None,
             **kwargs):
         print("SEEEEEEELLLLLLLLL")
-        side = "Sell"
+        pos = self.positions[None].size
+        if pos > 0:
+            side = "Sell"
+        else:
+            side = "Short"
         return self._submit(owner, data, side, exectype, size, price)
 
-    def short(self, owner, data, size, price=None, plimit=None,
-            exectype=None, valid=None, tradeid=0, oco=None,
-            trailamount=None, trailpercent=None,
-            **kwargs):
-        side = "Short"
-        return self._submit(owner, data, side, exectype, size, price)
-
-    def cover(self, owner, data, size, price=None, plimit=None,
-            exectype=None, valid=None, tradeid=0, oco=None,
-            trailamount=None, trailpercent=None,
-            **kwargs):
-        side = "Cover"
-        return self._submit(owner, data, side, exectype, size, price)
 
     def cancel(self, order):
-        order_id = order.wind_order['orderId']
-        self._store.cancel_order(order_id)
+        order_id = order.wind_order[0]
+        return self._store.cancel_order(order_id)
+
+    def cancel_open_orders(self):
+        for o in self.open_orders:
+            self.cancel(o)
         
     def format_price(self, value):
         return self._store.format_price(value)

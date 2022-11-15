@@ -10,39 +10,25 @@ class RSIStrategy(bt.Strategy):
         #self.rsi = bt.indicators.RSI(period=2)  # RSI indicator
         #self.rma = bt.indicators.EMA(period=2)
         self.round = 0
+        self.add_float = 0.01
 
     def next(self):
         print("open orders: ", len(self.broker.open_orders))
         self.broker.check_open_order_status()
+        self.broker.cancel_open_orders()
         print("round:", self.round)
         self.round += 1
         print("position:", self.position.size, self.position.price)
         price = self.data0.close[0]
         if self.round == 1:           
-            self.buy(price=price, data=self.data)
-        elif self.round == 2:
-            self.sell(price=price, data=self.data)
+            self.buy(price=price - self.add_float, data=self.data)
+ #       elif self.round == 2:
+            #self.sell(price=price + self.add_float, data=self.data)
+        elif self.round == 3:
+            self.sell(price=price + self.add_float, data=self.data)
+        elif self.round == 4:
+            self.buy(price=price - self.add_float, data=self.data)
             
-
-        # print('Open: {}, High: {}, Low: {}, Close: {}'.format(
-        #     self.data.open[0],
-        #     self.data.high[0],
-        #     self.data.low[0],
-        #     self.data.close[0]))
-        # print('RSI: {}'.format(self.rma[0]))
-        
-
-        # if not self.position:
-        #     print(self.rma[0])
-        #     if self.rma[0] < 200:  # Enter long
-        #         price = self.data0.close[0]
-        #         print(price)
-        #         self.buy(price = price)
-        # else:
-        #     print(self.rma[0])
-        #     if self.rma[0] > 200:
-        #         price = self.data0.close[0]
-        #         self.sell(price = price)  # Close long position
 
     def notify_order(self, order):
         print(order)
