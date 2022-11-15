@@ -36,7 +36,7 @@ class WindStore(object):
             raise
 
         self.symbol = target
-        #self.retries = retries
+        self.retries = retries
 
         self._cash = 0
         self._value = 0
@@ -50,6 +50,7 @@ class WindStore(object):
         self._data = None
 
     def retry(func):
+        import time
         @wraps(func)
         def wrapper(self, *args, **kwargs):
             for attempt in range(1, self.retries + 1):
@@ -58,7 +59,8 @@ class WindStore(object):
                 if result.ErrorCode == 0:
                     return result
                 if attempt == self.retries:
-                    raise ConnectionError("connect error")
+                    raise ConnectionError(result.Data[0][0])
+        return wrapper
 
     
     def cancel_open_orders(self):
@@ -87,16 +89,12 @@ class WindStore(object):
 
     @retry
     def get_asset_balance(self):
-        capital = self.w.tquery('Capital')
-        print(capital.Data)
-        free = capital.Data[1][0]
-        locked = capital.Data[4][0]
-        balance = {'free': free, 'locked': locked}
-        
-        return float(balance['free']), float(balance['locked'])
+        return self.w.tquery('Capital')
 
     def get_balance(self):
-        free, locked = self.get_asset_balance()
+        result = self.get_asset_balance()
+        free = result.Data[1][0]
+        locked = result.Data[4][0]
         self._cash = free
         self._value = free + locked
 
@@ -108,9 +106,11 @@ class WindStore(object):
             self._data = WindData(store=self, timeframe_in_minutes=timeframe_in_minutes, start_date=start_date)
         return self._data
 
+    @retry
     def get_realtime_data(self, symbol):
         return self.w.wsq(codes = symbol, fields ='rt_open, rt_high, rt_low, rt_last, rt_last_vol')
     
+    @retry
     def get_history_data(self, symbol, start_date):
         return self.w.wsi(codes = symbol, fields = "open, high, low, close, volume", beginTime = start_date)
         
@@ -125,19 +125,25 @@ class WindStore(object):
     # def get_interval(self, timeframe, compression):
     #     return self._GRANULARITIES.get((timeframe, compression))
 
-    @retry
+    
     def get_symbol_info(self, symbol):
         return symbol
-
+    
+    @retry
     def order_query(self):
         import time
         time.sleep(0.1)
         return self.w.tquery('Order')
 
+    @retry
     def trade_query(self):
         import time
         time.sleep(0.1)
         return self.w.tquery('Trade')
+
+    @retry
+    def position_query(self):
+        return self.w.tquery('Position')
 
     def stop_socket(self):
         self.w.logout()

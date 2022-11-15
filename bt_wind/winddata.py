@@ -29,15 +29,6 @@ class WindData(DataBase):
 
         self.symbol_info = self._store.get_symbol_info(self._store.symbol)
 
-    # def _handle_kline_socket_message(self, msg):
-    #     """https://binance-docs.github.io/apidocs/spot/en/#kline-candlestick-streams"""
-    #     if msg['e'] == 'kline':
-    #         if msg['k']['x']:  # Is closed
-    #             kline = self._parser_to_kline(msg['k']['t'], msg['k'])
-    #             self._data.extend(kline.values.tolist())
-    #     elif msg['e'] == 'error':
-    #         raise msg
-
     def _load(self):
         if self._state == self._ST_OVER:
             return False
@@ -89,7 +80,7 @@ class WindData(DataBase):
         time.sleep(5)
         print("add real time data", datetime.datetime.now())
         result = self._store.get_realtime_data(self.symbol_info)
-        
+        print(result)
         self.lines.datetime[0] = date2num(result.Times[0])
         self.lines.open[0] = result.Data[0][0]
         self.lines.high[0] = result.Data[1][0]
@@ -113,13 +104,6 @@ class WindData(DataBase):
         
     def start(self):
         DataBase.start(self)
-
-        # self.interval = self._store.get_interval(TimeFrame.Minutes, self.timeframe_in_minutes)
-        # if self.interval is None:
-        #     self._state = self._ST_OVER
-        #     self.put_notification(self.NOTSUPPORTED_TF)
-        #     return
-        
         
         if self.symbol_info is None:
             self._state = self._ST_OVER
@@ -131,8 +115,9 @@ class WindData(DataBase):
             self.put_notification(self.DELAYED)
             start_date_str = datetime.datetime.strftime(self.start_date, "%Y-%m-%d %H:%M:%S")
             result = self._store.get_history_data(self.symbol_info, start_date_str)
+            print(result)
             thedata = list(zip(result.Times, result.Data[0], result.Data[1], result.Data[2], result.Data[3], result.Data[4]))
         
             self._data.extend(thedata)            
-        else:
-            self._start_live()
+        # else:
+        #     self._start_live()

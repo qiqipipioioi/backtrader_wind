@@ -44,11 +44,10 @@ class WindBroker(BrokerBase):
         self.positions = defaultdict(Position)
 
         self.open_orders = list()
-
-
     
         self._store = store
 
+        #order init
         order_query = self._store.order_query()
         if order_query.ErrorCode != 0:
             raise('trade query failed')
@@ -56,17 +55,50 @@ class WindBroker(BrokerBase):
         order_ids = order_query.Data[0]
 
         self.order_dict = {}
-        for i in range(len(order_ids)):
-            order_id = order_ids[i]
-            order_status = order_query.Data[1][i]
-            order_side = order_query.Data[4][i]
-            order_price = order_query.Data[5][i]
-            order_size = order_query.Data[6][i]
-            order_time = order_query.Data[7][i]
-            if order_id:
-                self.order_dict[order_id] = [order_status, order_side, order_price, order_size, order_time]
+        if len(order_query.Data) > 3:
+            for i in range(len(order_ids)):
+                order_id = order_ids[i]
+                order_status = order_query.Data[1][i]
+                order_side = order_query.Data[4][i]
+                order_price = order_query.Data[5][i]
+                order_size = order_query.Data[6][i]
+                order_time = order_query.Data[7][i]
+                if order_id:
+                    self.order_dict[order_id] = [order_status, order_side, order_price, order_size, order_time]
 
-        #self._store.binance_socket.start_user_socket(self._handle_user_socket_message)
+        #postion init
+        size, price = self.get_position()
+        self.positions[None] = Position(size, price)
+
+
+    def get_position(self):
+        result = self._store.position_query()
+        trade_side = result.Data[4]
+        positions = result.Data[6]
+        trade_price = result.Data[2]
+        position_size = 0
+        position_price = 0
+        for i in range(len(trade_side)):
+            if trade_side[i] == "Buy":
+                position_size += positions[i]
+            elif trade_side[i] == "Short":
+                position_size -= positions[i]
+        if len(trade_price) > 1:
+            if position_size > 0 :
+                position_price = trade_price[0]
+            elif position_size < 0:
+                position_price = trade_price[1]
+        else:
+            position_price = trade_price[0]
+
+        return position_size, position_price
+
+
+    def getposition(self, data, clone=True):
+        pos = self.positions[data._dataname]
+        if clone:
+            pos = pos.clone()
+        return pos
 
 
     def _execute_order(self, order, date, executed_size, executed_price):
@@ -78,8 +110,9 @@ class WindBroker(BrokerBase):
             0, 0.0, 0.0,
             0.0, 0.0,
             0, 0.0)
-        pos = self.getposition(order.data, clone=False)
+        pos = self.getposition(order.data, clone = False)
         pos.update(copysign(executed_size, order.size), executed_price)
+        print("pos update:", pos)
 
     
     def _set_order_status(self, order, wind_order_status):
@@ -99,9 +132,6 @@ class WindBroker(BrokerBase):
         trade_query = self._store.trade_query()
         if trade_query.ErrorCode != 0:
             raise('trade query failed')
-        
-        print(order_query.Data)
-        print(trade_query.Data)
 
         order_ids = order_query.Data[0]
         trade_ids = trade_query.Data[0]
@@ -166,10 +196,15 @@ class WindBroker(BrokerBase):
                 order_id = o.wind_order[0]
                 if order_id in trade_query.Data[0]:
                     idx = trade_query.Data[0].index(order_id)
-                    order_status = trade_query.Data[1][idx]
+                    order_status = trade_query.Data[2][idx]
+                    print("here:", order_status)
                     if order_status == "Normal":
                         order_status = ORDER_STATUS_FILLED
+                        trade_price =  trade_query.Data[trade_query.Fields.index("TradedPrice")][idx]
+                        trade_size = trade_query.Data[trade_query.Fields.index("TradedVolume")][idx]
+                        trade_time = trade_query.Data[trade_query.Fields.index("TradedTime")][idx]
                         self._set_order_status(o, order_status)
+                        self._execute_order(o, trade_time, trade_size, trade_price)
                     elif order_status == "Invalid":
                         order_status = ORDER_STATUS_INVALID
                         self._set_order_status(o, order_status)
@@ -192,8 +227,7 @@ class WindBroker(BrokerBase):
         wind_order = self._check_order_status()
         if wind_order[0]:
             order = WindOrder(owner, data, exectype, wind_order)
-            
-            if wind_order[1] in ["normal"]:
+            if wind_order[1] in [ORDER_STATUS_FILLED]:
                 self._execute_order(
                     order,
                     wind_order[5],
@@ -201,7 +235,8 @@ class WindBroker(BrokerBase):
                     wind_order[3])
             
             self._set_order_status(order, wind_order[1])
-            if order.status == Order.submit:
+            print('order_stauts:', order.status, Order.submit, wind_order)
+            if order.status == Order.Submitted:
                 self.open_orders.append(order)
             self.notify(order)
             return order
@@ -256,12 +291,7 @@ class WindBroker(BrokerBase):
 
         return self.notifs.popleft()
 
-    def getposition(self, data, clone=True):
-        print("positions,", data._dataname, self.positions)
-        pos = self.positions[data._dataname]
-        if clone:
-            pos = pos.clone()
-        return pos
+
 
     def getvalue(self, datas=None):
         self.value = self._store._value

@@ -12,10 +12,11 @@ class RSIStrategy(bt.Strategy):
         self.round = 0
 
     def next(self):
+        print("open orders: ", len(self.broker.open_orders))
         self.broker.check_open_order_status()
         print("round:", self.round)
         self.round += 1
-
+        print("position:", self.position.size, self.position.price)
         price = self.data0.close[0]
         if self.round == 1:           
             self.buy(price=price, data=self.data)
@@ -56,7 +57,8 @@ if __name__ == '__main__':
     broker = store.getbroker()
     cerebro.setbroker(broker)
 
-    from_date = dt.datetime.utcnow() - dt.timedelta(minutes=600)
+    #from_date = dt.datetime.utcnow() - dt.timedelta(minutes=600)
+    from_date = None
     data = store.getdata(
         timeframe_in_minutes=5,
         start_date=from_date)
