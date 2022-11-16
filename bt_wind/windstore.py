@@ -95,12 +95,17 @@ class WindStore(object):
 
     def getdata(self, timeframe_in_minutes, start_date=None):
         if not self._data:
-            self._data = WindData(store=self, timeframe_in_minutes=timeframe_in_minutes, start_date=start_date)
+            self._data = WindData(store=self, timeframe_in_minutes=timeframe_in_minutes, 
+                 start_date=start_date)
         return self._data
 
     @retry
     def get_realtime_data(self, symbol):
         return self.w.wsq(codes = symbol, fields ='rt_open, rt_high, rt_low, rt_last, rt_last_vol')
+
+    @retry
+    def subscribe_realtime_data(self, symbol, datacallback):
+        return self.w.wsq(codes = symbol, fields ='rt_open, rt_high, rt_low, rt_last, rt_last_vol', func = datacallback)
     
     @retry
     def get_history_data(self, symbol, start_date):

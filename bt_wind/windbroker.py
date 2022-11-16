@@ -1,4 +1,4 @@
-import datetime as dt
+import datetime
 
 from collections import defaultdict, deque
 from math import copysign
@@ -79,6 +79,8 @@ class WindBroker(BrokerBase):
 
     def get_position(self):
         result = self._store.position_query()
+        if len(result.Data) == 3:
+            return 0, 0
         trade_side = result.Data[4]
         positions = result.Data[6]
         trade_price = result.Data[2]
