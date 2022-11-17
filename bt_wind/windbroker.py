@@ -1,4 +1,5 @@
 import datetime
+import time
 
 from collections import defaultdict, deque
 from math import copysign
@@ -23,6 +24,7 @@ class WindOrder(OrderBase):
         self.data = data
         self.exectype = exectype
 
+        print(wind_order)
         wind_order_status = wind_order[2]
         if wind_order_status == "Short":
             wind_order_status = "Sell"
@@ -73,11 +75,12 @@ class WindBroker(BrokerBase):
                     self.order_dict[order_id] = [order_status, order_side, order_price, order_size, order_time]
 
         #postion init
-        size, price = self.get_position()
-        self.positions[None] = Position(size, price)
+        self.positions[None] = Position(0, 0)
+        self.sync_position()
 
 
-    def get_position(self):
+
+    def sync_position(self):
         result = self._store.position_query()
         if len(result.Data) == 3:
             return 0, 0
@@ -86,20 +89,20 @@ class WindBroker(BrokerBase):
         trade_price = result.Data[2]
         position_size = 0
         position_price = 0
+        total_value = 0
         for i in range(len(trade_side)):
             if trade_side[i] == "Buy":
                 position_size += positions[i]
+                total_value += trade_price[i] * positions[i]
             elif trade_side[i] == "Short":
                 position_size -= positions[i]
-        if len(trade_price) > 1:
-            if position_size > 0 :
-                position_price = trade_price[0]
-            elif position_size < 0:
-                position_price = trade_price[1]
-        else:
-            position_price = trade_price[0]
+                total_value -= trade_price[i] * positions[i]
+        
+        position_price = total_value / position_size
 
-        return position_size, position_price
+        pos = self.positions[None]
+        pos.update(position_size, position_price)
+
 
 
     def getposition(self, data, clone=True):
@@ -120,6 +123,7 @@ class WindBroker(BrokerBase):
             0, 0.0)
         pos = self.getposition(order.data, clone = False)
         pos.update(copysign(executed_size, order.size), executed_price)
+        print("pos updated!", pos)
 
 
     
@@ -141,8 +145,13 @@ class WindBroker(BrokerBase):
         if trade_query.ErrorCode != 0:
             raise('trade query failed')
 
+
+
         order_ids = order_query.Data[0]
         trade_ids = trade_query.Data[0]
+
+        print("order_query", order_ids)
+        print("trade_query", trade_ids)
 
         order_dict = {}
         for i in range(len(order_ids)):
@@ -162,28 +171,36 @@ class WindBroker(BrokerBase):
         this_order_price = None
         this_order_size = None
         this_order_time = None
-        
-        if len(order_dict) - len(self.order_dict) == 1:
 
-            this_order_id = list(set(order_dict.keys()) - set(self.order_dict.keys()))[0]
+        check_order_id_list = list(set(order_dict.keys()) - set(self.order_dict.keys()))
+        
+        print("check_order_id_list, ", check_order_id_list)
+        if len(check_order_id_list) == 1:
+
+            this_order_id = check_order_id_list[0]
             
-            this_order_status = ORDER_STATUS_SUBMITIED
-            this_order_side = order_dict[this_order_id][1]
-            this_order_price = order_dict[this_order_id][2]
-            this_order_size = order_dict[this_order_id][3]
-            this_order_time = order_dict[this_order_id][4]
-            if this_order_id in trade_ids:
-                idx = trade_query.Data[0].index(this_order_id)
-                this_trade_status = trade_query.Data[2][idx]
-                if this_trade_status == "Normal":
-                    this_order_status = ORDER_STATUS_FILLED
-                    this_order_price = trade_query.Data[trade_query.Fields.index("TradedPrice")][idx]
-                    this_order_size = trade_query.Data[trade_query.Fields.index("TradedVolume")][idx]
-                    this_order_time = trade_query.Data[trade_query.Fields.index("TradedTime")][idx]
-                elif this_trade_status == "Canceled":
-                    this_order_status = ORDER_STATUS_CANCELED
-                else:
-                    this_order_status = ORDER_STATUS_INVALID
+            if order_dict[this_order_id][0] == "Normal":
+                this_order_status = ORDER_STATUS_SUBMITIED
+                this_order_side = order_dict[this_order_id][1]
+                this_order_price = order_dict[this_order_id][2]
+                this_order_size = order_dict[this_order_id][3]
+                this_order_time = order_dict[this_order_id][4]
+                if this_order_id in trade_ids:
+                    idx = trade_query.Data[0].index(this_order_id)
+                    this_trade_status = trade_query.Data[2][idx]
+                    if this_trade_status == "Normal":
+                        this_order_status = ORDER_STATUS_FILLED
+                        this_order_price = trade_query.Data[trade_query.Fields.index("TradedPrice")][idx]
+                        this_order_size = trade_query.Data[trade_query.Fields.index("TradedVolume")][idx]
+                        this_order_time = trade_query.Data[trade_query.Fields.index("TradedTime")][idx]
+                    elif this_trade_status == "Canceled":
+                        this_order_status = ORDER_STATUS_CANCELED
+                    else:
+                        this_order_status = ORDER_STATUS_INVALID
+            elif order_dict[this_order_id][0] == "Invalid":
+                this_order_status = ORDER_STATUS_INVALID
+            elif order_dict[this_order_id][0] == "Cancelled":
+                this_order_status = ORDER_STATUS_CANCELED
 
         self.order_dict = order_dict
 
@@ -197,30 +214,32 @@ class WindBroker(BrokerBase):
         
 
     def check_open_order_status(self):
+        trade_query = self._store.trade_query()
+        if trade_query.ErrorCode != 0:
+            raise('trade query failed')
 
         order_query = self._store.order_query()
         if order_query.ErrorCode != 0:
             raise('order query failed')
-
-
-        trade_query = self._store.trade_query()
-        if trade_query.ErrorCode != 0:
-            raise('trade query failed')
         if  self.open_orders:       
             for o in self.open_orders:
                 order_id = o.wind_order[0]
+                print("open order iiiiiiiiiiiiiiiiiddddddddddd", order_id)
                 if order_id in order_query.Data[0]:
                     idx1 = order_query.Data[0].index(order_id)
                     order_status1 = order_query.Data[1][idx1]
+                    print("open order sssssssssssstaaaaaaaaaaaaattttttuuuuuussssss", order_status1)
                     if order_status1 in [ORDER_STATUS_CANCELED, ORDER_STATUS_INVALID]:
                         self._set_order_status(o, order_status1)
                         self.open_orders.remove(o)
                         self.notify(o)
                         continue
+                print("open trade iiiiiiiiiiddddddddddddddddssssssss", trade_query.Data[0])
+                
                 if order_id in trade_query.Data[0]:
                     idx2 = trade_query.Data[0].index(order_id)
                     order_status2 = trade_query.Data[2][idx2]
-
+                    
                     if order_status2 == "Normal":
                         order_status2 = ORDER_STATUS_FILLED
                         trade_price =  trade_query.Data[trade_query.Fields.index("TradedPrice")][idx2]
@@ -248,6 +267,7 @@ class WindBroker(BrokerBase):
             raise("request failed")
 
         wind_order = self._check_order_status()
+        print("wind_order:", wind_order)
         if wind_order[0]:
             order = WindOrder(owner, data, exectype, wind_order)
             if wind_order[1] in [ORDER_STATUS_FILLED]:
@@ -257,7 +277,9 @@ class WindBroker(BrokerBase):
                     wind_order[4],
                     wind_order[3])
             
+  
             self._set_order_status(order, wind_order[1])
+            print("popip status ",order.status, Order.Submitted)
             if order.status == Order.Submitted:
                 self.open_orders.append(order)
             self.notify(order)
@@ -291,11 +313,14 @@ class WindBroker(BrokerBase):
 
     def cancel(self, order):
         order_id = order.wind_order[0]
+        print("removeeeeeeeeeeeeeeeee", order_id)
         return self._store.cancel_order(order_id)
 
     def cancel_open_orders(self):
         for o in self.open_orders:
             self.cancel(o)
+            self.open_orders.remove(o)
+
         
     def format_price(self, value):
         return self._store.format_price(value)

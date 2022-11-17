@@ -86,7 +86,7 @@ if __name__ == '__main__':
     store = WindStore(logonAccount="M5Q1V8R2732",
                       password="0",
                       accountType="CFE",
-                      target="T2212.CFE")
+                      target="T2303.CFE")
     broker = store.getbroker()
     cerebro.setbroker(broker)
 
