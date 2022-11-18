@@ -137,8 +137,10 @@ class WindBroker(BrokerBase):
             order.submit()
         elif wind_order_status == ORDER_STATUS_INVALID:
             order.reject()
-    
-    def _check_order_status(self):
+
+
+
+    def order_status_query(self):
         order_query = self._store.order_query()
         if order_query.ErrorCode != 0:
             raise('order query failed')
@@ -163,8 +165,13 @@ class WindBroker(BrokerBase):
             order_time = order_query.Data[7][i]
             if order_id:
                 order_dict[order_id] = [order_status, order_side, order_price, order_size, order_time]
+
+        return order_dict, order_ids, trade_ids
+
     
-        
+    def _check_order_status(self):
+        order_dict, order_ids, trade_ids = self.order_status_query()
+    
         this_order_id = None
         this_order_status = ORDER_STATUS_INVALID
         this_order_side = None
@@ -173,14 +180,19 @@ class WindBroker(BrokerBase):
         this_order_time = None
 
         check_order_id_list = list(set(order_dict.keys()) - set(self.order_dict.keys()))
-        
+
+        if len(check_order_id_list) != 1:
+            time.sleep(0.5)
+            order_dict, order_ids, trade_ids = self.order_status_query()
+            check_order_id_list = list(set(order_dict.keys()) - set(self.order_dict.keys()))
 
         print("old_order_query,", list(self.order_dict.keys()))
         print("order_query", order_ids)
         print("trade_query", trade_ids)
+        print("check_order_id_list, ", check_order_id_list)
 
         
-        print("check_order_id_list, ", check_order_id_list)
+
         if len(check_order_id_list) == 1:
 
             this_order_id = check_order_id_list[0]
@@ -329,7 +341,7 @@ class WindBroker(BrokerBase):
     def cancel_open_orders(self):
         for o in self.open_orders:
             self.cancel(o)
-            self.open_orders.remove(o)
+            
 
         
     def format_price(self, value):

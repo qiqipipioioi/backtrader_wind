@@ -14,9 +14,9 @@ class RSIStrategy(bt.Strategy):
 
     params = (('margin', 0.02),
               ('mult', 10000),
-              ('close_lost', -100),
+              ('close_lost', -200),
               ('fix_size', 2),
-              ('flip', 0.005),
+              ('flip', 0),
               ('wait_fill', 10)
     )
 
@@ -217,6 +217,6 @@ if __name__ == '__main__':
     cerebro.adddata(data)
 
 #    cerebro.resampledata(data, timeframe=bt.TimeFrame.Minutes, compression=1)
-    cerebro.resampledata(data, timeframe=bt.TimeFrame.Seconds, compression=2)
+    cerebro.resampledata(data, timeframe=bt.TimeFrame.Seconds, compression=10)
 
     cerebro.run()
