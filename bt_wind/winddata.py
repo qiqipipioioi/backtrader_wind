@@ -65,7 +65,6 @@ class WindData(DataBase):
             data = self._data.popleft()
         except IndexError:
             return None
-        print("add real time data", datetime.now())
         self.lines.datetime[0] = date2num(data[0])
         self.lines.open[0] = data[1]
         self.lines.high[0] = data[2]

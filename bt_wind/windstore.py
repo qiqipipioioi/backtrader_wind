@@ -116,14 +116,14 @@ class WindStore(object):
     
     @retry
     def order_query(self):
-        import time
-        time.sleep(0.1)
+        # import time
+        # time.sleep(0.1)
         return self.w.tquery('Order')
 
     @retry
     def trade_query(self):
-        import time
-        time.sleep(0.1)
+        # import time
+        # time.sleep(0.1)
         return self.w.tquery('Trade')
 
     @retry

@@ -97,11 +97,12 @@ class WindBroker(BrokerBase):
             elif trade_side[i] == "Short":
                 position_size -= positions[i]
                 total_value -= trade_price[i] * positions[i]
-        
-        position_price = total_value / position_size
+        if position_size != 0:
+            position_price = total_value / position_size
+        else:
+            position_price = 0
 
-        pos = self.positions[None]
-        pos.update(position_size, position_price)
+        self.positions[None] = Position(position_size, position_price)
 
 
 
@@ -150,8 +151,7 @@ class WindBroker(BrokerBase):
         order_ids = order_query.Data[0]
         trade_ids = trade_query.Data[0]
 
-        print("order_query", order_ids)
-        print("trade_query", trade_ids)
+
 
         order_dict = {}
         for i in range(len(order_ids)):
@@ -173,6 +173,12 @@ class WindBroker(BrokerBase):
         this_order_time = None
 
         check_order_id_list = list(set(order_dict.keys()) - set(self.order_dict.keys()))
+        
+
+        print("old_order_query,", list(self.order_dict.keys()))
+        print("order_query", order_ids)
+        print("trade_query", trade_ids)
+
         
         print("check_order_id_list, ", check_order_id_list)
         if len(check_order_id_list) == 1:
@@ -202,7 +208,7 @@ class WindBroker(BrokerBase):
             elif order_dict[this_order_id][0] == "Cancelled":
                 this_order_status = ORDER_STATUS_CANCELED
 
-        self.order_dict = order_dict
+            self.order_dict = order_dict
 
 
         return [this_order_id, 
@@ -265,7 +271,7 @@ class WindBroker(BrokerBase):
             print("order request succeed!")
         else:
             raise("request failed")
-
+        time.sleep(0.2)
         wind_order = self._check_order_status()
         print("wind_order:", wind_order)
         if wind_order[0]:
@@ -289,12 +295,14 @@ class WindBroker(BrokerBase):
             exectype=None, valid=None, tradeid=0, oco=None,
             trailamount=None, trailpercent=None,
             **kwargs):
-        print("BBBBBBUUUUUUYYYYY")
+        
         pos = self.positions[None].size
         if pos >= 0:
             side = "Buy"
+            print("BBBBBBUUUUUUYYYYY")
         else:
             side = "Cover"
+            print("COOOOOVVVVVVVVVEEEEEEERRRRRRRR")
         return self._submit(owner, data, side, exectype, size, price)
 
 
@@ -302,12 +310,14 @@ class WindBroker(BrokerBase):
             exectype=None, valid=None, tradeid=0, oco=None,
             trailamount=None, trailpercent=None,
             **kwargs):
-        print("SEEEEEEELLLLLLLLL")
+
         pos = self.positions[None].size
         if pos > 0:
             side = "Sell"
+            print("SEEEEEEELLLLLLLLL")
         else:
             side = "Short"
+            print("SHOORRRRTTTTTTT")
         return self._submit(owner, data, side, exectype, size, price)
 
 
@@ -341,6 +351,7 @@ class WindBroker(BrokerBase):
 
 
     def getvalue(self, datas=None):
+        self._store.get_balance()
         self.value = self._store._value
         return self.value
 
