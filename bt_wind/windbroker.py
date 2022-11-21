@@ -165,12 +165,12 @@ class WindBroker(BrokerBase):
             order_time = order_query.Data[7][i]
             if order_id:
                 order_dict[order_id] = [order_status, order_side, order_price, order_size, order_time]
-
-        return order_dict, order_ids, trade_ids
+        print(order_dict)
+        return order_dict, order_ids, trade_ids, order_query, trade_query
 
     
     def _check_order_status(self):
-        order_dict, order_ids, trade_ids = self.order_status_query()
+        order_dict, order_ids, trade_ids, order_query, trade_query = self.order_status_query()
     
         this_order_id = None
         this_order_status = ORDER_STATUS_INVALID
@@ -183,7 +183,7 @@ class WindBroker(BrokerBase):
 
         if len(check_order_id_list) != 1:
             time.sleep(0.5)
-            order_dict, order_ids, trade_ids = self.order_status_query()
+            order_dict, order_ids, trade_ids, order_query, trade_query = self.order_status_query()
             check_order_id_list = list(set(order_dict.keys()) - set(self.order_dict.keys()))
 
         print("old_order_query,", list(self.order_dict.keys()))
